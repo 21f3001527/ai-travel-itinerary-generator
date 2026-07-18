@@ -1,6 +1,6 @@
 # ✈️ AI Travel Itinerary Generator
 
-A free, fully automated workflow that turns a simple form submission into a personalized, AI-generated travel itinerary — complete with real weather data, restaurant recommendations, and hidden gems — delivered as a polished PDF straight to your inbox in under a minute.
+A free, fully automated workflow that turns a simple form submission into a personalized, AI-generated travel itinerary  complete with real weather data, restaurant recommendations, and hidden gems — delivered as a polished PDF straight to your inbox in under a minute.
 
 ## How It Works
 
