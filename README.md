@@ -2,6 +2,14 @@
 
 A free, fully automated workflow that turns a simple form submission into a personalized, AI-generated travel itinerary  complete with real weather data, restaurant recommendations, and hidden gems — delivered as a polished PDF straight to your inbox in under a minute.
 
+<p align="center">
+  <a href="https://forms.gle/BuYF1SCTkkpDfgh79">
+    <img src="https://img.shields.io/badge/Try%20It%20Live-Fill%20Out%20The%20Form-4CAF50?style=for-the-badge&logo=googleforms&logoColor=white" alt="Try it live">
+  </a>
+</p>
+
+**🔗 Live demo:** [forms.gle/BuYF1SCTkkpDfgh79](https://forms.gle/BuYF1SCTkkpDfgh79)
+
 ## How It Works
 
 ```
