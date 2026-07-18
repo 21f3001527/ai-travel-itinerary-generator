@@ -1,0 +1,418 @@
+{
+  "name": "AI Travel Itinerary Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "travel-itinerary",
+        "options": {
+          "allowedOrigins": "*",
+          "binaryPropertyName": "data",
+          "onlyRunIf": "",
+          "rawBody": true,
+          "responseCode": {
+            "values": {}
+          },
+          "responseData": ""
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        32
+      ],
+      "id": "f4b7c8b4-2326-47b1-a323-8a1db48fd9df",
+      "name": "Webhook",
+      "webhookId": "b00ae3eb-4c07-46cb-8e58-55a91afd9a1b",
+      "alwaysOutputData": true,
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.item.json.body;\n\nconst startDate = new Date(data.start_date);\nconst endDate = new Date(data.end_date);\n\nconst diffTime = endDate - startDate;\nconst days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;\n\nreturn {\n  name: data.name,\n  city: data.city,\n  gender: data.gender,\n  destination: data.destination,\n  start_date: data.start_date,\n  end_date: data.end_date,\n  days: days,\n  budget: data.budget,\n  interests: data.interests,\n  email: data.email\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        32
+      ],
+      "id": "0279398e-926b-4447-a068-50265f7ad57a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "url": "http://api.weatherapi.com/v1/forecast.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "YOUR_WEATHERAPI_KEY_HERE"
+            },
+            {
+              "name": "q",
+              "value": "={{ $json.destination }}"
+            },
+            {
+              "name": "days",
+              "value": "={{ $json.days }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        448,
+        32
+      ],
+      "id": "be28c1ad-8f38-46cf-b4fc-5144fc58b69a",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const weather = $input.item.json;\nconst forecastDays = weather.forecast.forecastday;\n\nlet summary = [];\nfor (const day of forecastDays) {\n  summary.push({\n    date: day.date,\n    condition: day.day.condition.text,\n    max_temp_c: day.day.maxtemp_c,\n    min_temp_c: day.day.mintemp_c,\n    chance_of_rain: day.day.daily_chance_of_rain + \"%\"\n  });\n}\n\nconst tripData = $('Code in JavaScript').item.json;\n\nconst promptText = `Create a ${tripData.days}-day itinerary for ${tripData.destination}. Budget level: ${tripData.budget}. Interests: ${tripData.interests}. Weather forecast: ${JSON.stringify(summary)}. Break each day into Morning, Afternoon, and Evening sections. Include restaurant name suggestions, approximate activity costs, and 1-2 hidden gem recommendations per day. End with a simple budget table summarizing estimated costs. Format the entire response as clean HTML (no markdown, no code blocks) suitable for embedding in an email.`;\n\nconst groqBody = {\n  model: \"llama-3.3-70b-versatile\",\n  messages: [\n    { role: \"system\", content: \"You are an expert travel planner. Create detailed, practical day-by-day itineraries formatted in clean HTML.\" },\n    { role: \"user\", content: promptText }\n  ]\n};\n\nreturn {\n  destination: tripData.destination,\n  email: tripData.email,\n  weather_summary: summary,\n  groqRequestBody: groqBody\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        32
+      ],
+      "id": "baac5074-7404-4a7a-80dc-ddd6ab2f5da2",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY_HERE"
+            },
+            {
+              "name": " Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.groqRequestBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        896,
+        32
+      ],
+      "id": "4ea15c46-340b-4f1a-b6ef-13be1dc13c18",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const groqResponse = $input.item.json;\nconst itineraryHtml = groqResponse.choices[0].message.content;\n\nconst tripData = $('Code in JavaScript').item.json;\nconst weatherData = $('Code in JavaScript1').item.json.weather_summary;\n\nlet weatherCards = '';\nfor (const day of weatherData) {\n  weatherCards += `\n    <div style=\"display:inline-block; background:#f0f7ff; border-radius:12px; padding:14px 18px; margin:6px; text-align:center; min-width:130px; box-shadow:0 1px 4px rgba(0,0,0,0.08);\">\n      <div style=\"font-size:13px; color:#5b7a9d; font-weight:600;\">${day.date}</div>\n      <div style=\"font-size:14px; color:#333; margin:4px 0;\">${day.condition}</div>\n      <div style=\"font-size:16px; font-weight:700; color:#2c5f8a;\">${day.max_temp_c}° / ${day.min_temp_c}°C</div>\n      <div style=\"font-size:12px; color:#888;\">🌧 ${day.chance_of_rain} rain</div>\n    </div>`;\n}\n\nconst fullHtml = `\n<html>\n<head>\n<style>\n  body { font-family: 'Segoe UI', Arial, sans-serif; padding: 0; margin:0; color: #2d2d2d; background:#fafafa; }\n  .container { max-width: 700px; margin: 0 auto; padding: 30px; }\n  .hero { background: linear-gradient(135deg, #2c5f8a, #4a90c2); color: white; padding: 40px 30px; border-radius: 16px; margin-bottom: 24px; }\n  .hero h1 { margin: 0 0 8px 0; font-size: 28px; }\n  .hero p { margin: 4px 0; opacity: 0.95; font-size: 15px; }\n  .section-title { font-size: 20px; color: #2c5f8a; margin: 28px 0 14px 0; border-bottom: 2px solid #e0ecf5; padding-bottom: 8px; }\n  .weather-row { display: flex; flex-wrap: wrap; justify-content: flex-start; }\n  h2, h3, h4 { color: #2c5f8a; }\n  h3 { background:#f0f7ff; padding:10px 14px; border-radius:8px; margin-top:24px; }\n  p { line-height: 1.6; font-size: 14.5px; }\n  table { width: 100%; border-collapse: collapse; margin-top: 12px; }\n  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #e5e5e5; font-size: 14px; }\n  th { background: #2c5f8a; color: white; }\n  tr:nth-child(even) { background: #f7fafc; }\n  .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #999; padding: 20px; }\n</style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"hero\">\n      <h1>✈️ Your Trip to ${tripData.destination}</h1>\n      <p>📅 ${tripData.start_date} → ${tripData.end_date} (${tripData.days} days)</p>\n      <p>💰 Budget: ${tripData.budget}</p>\n    </div>\n\n    <div class=\"section-title\">Weather Forecast</div>\n    <div class=\"weather-row\">${weatherCards}</div>\n\n    <div class=\"section-title\">Your Itinerary</div>\n    ${itineraryHtml}\n\n    <div class=\"footer\">Generated automatically just for you. Have an amazing trip! 🌴</div>\n  </div>\n</body>\n</html>\n`;\n\nreturn {\n  name: tripData.name,\n  destination: tripData.destination,\n  email: tripData.email,\n  fullHtml: fullHtml\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        32
+      ],
+      "id": "84bd26a8-b632-4d25-97e2-bae3e828a23a",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.html2pdf.app/v1/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"html\": $json.fullHtml, \"apiKey\": \"YOUR_HTML2PDF_API_KEY_HERE\" } }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1312,
+        32
+      ],
+      "id": "69532ddc-094a-41a6-bd13-5bab3245c858",
+      "name": "HTTP Request2"
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Code in JavaScript2').item.json.destination }}_itinerary.pdf",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1520,
+        32
+      ],
+      "id": "65908498-a5c0-46ff-9088-cf760253be75",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "Q9PyKwnln6bvV1at",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript2').item.json.email }}",
+        "subject": "={{ $('Code in JavaScript2').item.json.name }}, your {{ $('Code in JavaScript2').item.json.destination }} itinerary is ready! 🌴",
+        "message": "=<div style=\"font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; background: #fafafa;\">\n  <div style=\"background: linear-gradient(135deg, #2c5f8a, #4a90c2); border-radius: 16px; padding: 30px; text-align: center; margin-bottom: 24px;\">\n    <h1 style=\"color: white; margin: 0; font-size: 24px;\">✈️ Your Journey Awaits</h1>\n  </div>\n\n  <p style=\"font-size: 16px; color: #333; line-height: 1.6;\">\n    Dear {{ $('Code in JavaScript2').item.json.name }},\n  </p>\n\n  <p style=\"font-size: 15px; color: #444; line-height: 1.7;\">\n    It's been a pleasure putting together your personalized travel plan. Your itinerary for\n    <b>{{ $('Code in JavaScript2').item.json.destination }}</b> is ready, complete with a day-by-day plan,\n    local recommendations, and the latest weather forecast for your trip.\n  </p>\n\n  <div style=\"background: white; border-radius: 12px; padding: 20px; margin: 24px 0; box-shadow: 0 1px 6px rgba(0,0,0,0.08);\">\n    <p style=\"margin: 0 0 8px 0; font-size: 14px; color: #666;\">📍 <b>Destination:</b> {{ $('Code in JavaScript').item.json.destination }}</p>\n    <p style=\"margin: 0 0 8px 0; font-size: 14px; color: #666;\">📅 <b>Dates:</b> {{ $('Code in JavaScript').item.json.start_date }} to {{ $('Code in JavaScript').item.json.end_date }} ({{ $('Code in JavaScript').item.json.days }} days)</p>\n    <p style=\"margin: 0; font-size: 14px; color: #666;\">💰 <b>Budget:</b> {{ $('Code in JavaScript').item.json.budget }}</p>\n  </div>\n\n  <div style=\"text-align: center; margin: 30px 0;\">\n    <a href=\"{{ $('Upload file').item.json.webContentLink }}\" style=\"background: #2c5f8a; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: 600; display: inline-block;\">\n      📄 Download Your Itinerary\n    </a>\n  </div>\n\n  <p style=\"font-size: 15px; color: #444; line-height: 1.7;\">\n    Wishing you safe travels and unforgettable memories. If your plans change or you'd like anything\n    adjusted, feel free to reach out anytime.\n  </p>\n\n  <p style=\"font-size: 15px; color: #444; margin-top: 30px;\">\n    Warm regards,<br>\n    <b>Your Personal Travel Assistant</b>\n  </p>\n\n  <hr style=\"border: none; border-top: 1px solid #e0e0e0; margin: 30px 0;\">\n  <p style=\"font-size: 12px; color: #aaa; text-align: center;\">\n    This itinerary was crafted specially for you based on your preferences and current weather conditions.\n  </p>\n</div>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2128,
+        48
+      ],
+      "id": "fd59051b-d0b2-4d9a-bfd0-cb46864097a2",
+      "name": "Send a message",
+      "webhookId": "f71ce9b6-003c-47b8-9e2b-fb0dc3ae248d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "b47BfiR10Fe0kXOd",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "share",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Upload file').item.json.id }}",
+          "mode": "id"
+        },
+        "permissionsUi": {
+          "permissionsValues": {
+            "role": "reader",
+            "type": "anyone"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1728,
+        32
+      ],
+      "id": "5af3f6b4-51a2-43fb-b4cb-70f5aecaf534",
+      "name": "Share file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "Q9PyKwnln6bvV1at",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $('Upload file').item.json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"copyRequiresWriterPermission\": false } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1936,
+        32
+      ],
+      "id": "8cb2094a-bfaa-439e-832e-e162f209f013",
+      "name": "HTTP Request3",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "Q9PyKwnln6bvV1at",
+          "name": "Google Drive account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file": {
+      "main": [
+        [
+          {
+            "node": "Share file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Share file": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request3": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f4f12933-f5c7-41f0-afbc-8c53087e3543",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3ff67906a47f8ceee563f0993265a5bef5307620d40ee9c63cf5c64b40d5ac31"
+  },
+  "nodeGroups": [],
+  "id": "d7dpZ35lyME9nXGe",
+  "tags": []
+}
